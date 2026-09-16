@@ -1,3 +1,4 @@
+// 
 const { GoogleGenAI } = require("@google/genai")
 const { z } = require("zod")
 const { zodToJsonSchema } = require("zod-to-json-schema")
@@ -31,7 +32,7 @@ function isModelFallbackError(error) {
     return /no longer available|unavailable|not found|404|NOT_FOUND|quota/i.test(message)
 }
 
-async function generateAiContent({ prompt, schema }) {
+async function generateAiContent({ prompt, schema, maxOutputTokens = 8192 }) {
     const models = [DEFAULT_GEMINI_MODEL]
     if (FALLBACK_GEMINI_MODEL && FALLBACK_GEMINI_MODEL !== DEFAULT_GEMINI_MODEL) {
         models.push(FALLBACK_GEMINI_MODEL)
@@ -50,6 +51,7 @@ async function generateAiContent({ prompt, schema }) {
                 config: {
                     responseMimeType: "application/json",
                     responseSchema: zodToJsonSchema(schema),
+                    maxOutputTokens,
                 }
             })
         } catch (error) {
@@ -194,6 +196,9 @@ Job Description: ${jobDescription}
         schema: interviewReportSchema,
     })
 
+    console.log("AI finish reason:", response?.candidates?.[0]?.finishReason)
+    console.log("AI raw response length:", response?.text?.length)
+
     const parsedResponse = response?.text ? parseJsonResponse(response.text) : {}
     return normalizeInterviewReport(parsedResponse, jobDescription)
 
@@ -242,6 +247,7 @@ async function generateResumePdf({ resume, selfDescription, jobDescription }) {
     const response = await generateAiContent({
         prompt,
         schema: resumePdfSchema,
+        maxOutputTokens: 16384,
     })
 
     const jsonContent = parseJsonResponse(response.text)
